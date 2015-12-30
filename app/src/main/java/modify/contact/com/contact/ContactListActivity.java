@@ -1,9 +1,11 @@
 package modify.contact.com.contact;
 
 import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.os.Bundle;
+import android.provider.ContactsContract;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.support.v4.app.FragmentActivity;
 import android.util.Log;
@@ -90,11 +92,19 @@ public class ContactListActivity extends FragmentActivity {
 
             Log.i("List", info.toString());
 
+            int i = 0;
 
+            for (String number : newNumer){
+                ContentValues values = new ContentValues();
+                values.put(Phone.NUMBER, number);
+
+                update(cr, info.getId().get(i) , values);
+                i++;
+            }
 
         }
 
-
+        map = null;
     }
 
 
@@ -208,6 +218,8 @@ public class ContactListActivity extends FragmentActivity {
                     s += "[" + k + "]" + "[" + originNumbers.get(i) +  "]" + newNumbers.get(i) +  "], ";
                 }catch (Exception e){
                     continue;
+                }finally {
+                    i++;
                 }
             }
             //[id][originNumber][newNumber]
@@ -216,6 +228,17 @@ public class ContactListActivity extends FragmentActivity {
     }
 
 
+    /**
+     * 更新联系人信息
+     * @param cr
+     * @param id
+     * @param values
+     */
+    public void update(ContentResolver cr, String id, ContentValues values) {
+        String where = Phone._ID + " = " + id;
+        int r = cr.update(ContactsContract.Data.CONTENT_URI, values, where, null);
+        Log.i("result", "number: [" + values.get(Phone.NUMBER) + "]: " + r);
+    }
 
 
 }
