@@ -15,7 +15,6 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -39,9 +38,9 @@ public class ContactListActivity extends FragmentActivity {
         ListView listView = (ListView) findViewById(R.id.listView);
 
         ContentResolver cr = getContentResolver();
-        HashMap<String, Info> map = new HashMap<String, Info>();
+        HashMap<String, Info> map = new HashMap<>();
         Cursor phone = cr.query(Phone.CONTENT_URI, new String[]{
-                Phone.CONTACT_ID, Phone.NUMBER, Phone.DISPLAY_NAME}, null, null, null);
+                Phone._ID, Phone.CONTACT_ID, Phone.NUMBER, Phone.DISPLAY_NAME}, null, null, null);
         if (null == phone) {
             Log.d("phoneNumber", "there is no phoneNumber.");
             return;
@@ -50,30 +49,49 @@ public class ContactListActivity extends FragmentActivity {
             String phoneNumber = phone.getString(phone.getColumnIndex(Phone.NUMBER));
             String name = phone.getString(phone.getColumnIndex(Phone.DISPLAY_NAME));
             String id = phone.getString(phone.getColumnIndex(Phone.CONTACT_ID));
+            String phoneID = phone.getString(phone.getColumnIndex(Phone._ID));
             Info info = map.get(id);
             if (null == info) {
                 info = new Info();
-                info.setId(id);
+                ArrayList<String> ids = new ArrayList<>();
+                ArrayList<String> number = new ArrayList<>();
+
+                ids.add(phoneID);
+                info.setId(ids);
+
                 info.setName(name);
-                ArrayList<String> arrayList = new ArrayList<>();
-                arrayList.add(phoneNumber);
-                info.setOriginNumbers(arrayList);
+
+                number.add(phoneNumber);
+                info.setOriginNumbers(number);
                 map.put(id, info);
-            } else{
+            } else {
                 info.getOriginNumbers().add(phoneNumber);
+                info.getId().add(phoneID);
             }
         }
         phone.close();
 
-        Iterator<Map.Entry<String, Info>> it = map.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<String, Info> entry = it.next();
-            System.out.println("key= " + entry.getKey() + " and value= " + entry.getValue());
+//        Iterator<Map.Entry<String, Info>> it = map.entrySet().iterator();
+//        while (it.hasNext()) {
+//            Map.Entry<String, Info> entry = it.next();
+//            System.out.println("key= " + entry.getKey() + " and value= " + entry.getValue());
+//        }
 
-            String id = entry.getKey();
-            Info info = entry.getValue();
+        for (String key : map.keySet()) {
+            Info info = map.get(key);
+
+            ArrayList<String> originNumber = info.getOriginNumbers();
+            ArrayList<String> newNumer = info.getNewNumbers();
+
+            for (String number : originNumber){
+                newNumer.add(number.replaceAll("[\\s-]", ""));
+            }
+            info.setNewNumbers(newNumer);
 
             Log.i("List", info.toString());
+
+
+
         }
 
 
@@ -102,28 +120,21 @@ public class ContactListActivity extends FragmentActivity {
     private static final int PHONES_CONTACT_ID_INDEX = 2;
 
 
-
-
-
-
-
-
-
-
-
     private class MyAdapter extends SimpleAdapter {
         int count = 0;
         private List<Map<String, Integer>> mItemList;
+
         public MyAdapter(Context context, List<? extends Map<String, Integer>> data,
                          int resource, String[] from, int[] to) {
             super(context, data, resource, from, to);
             mItemList = (List<Map<String, Integer>>) data;
-            if(data == null){
+            if (data == null) {
                 count = 0;
-            }else{
+            } else {
                 count = data.size();
             }
         }
+
         public int getCount() {
             return mItemList.size();
         }
@@ -138,10 +149,10 @@ public class ContactListActivity extends FragmentActivity {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            Map<String ,Integer> map = mItemList.get(position);
+            Map<String, Integer> map = mItemList.get(position);
             View view = super.getView(position, convertView, parent);
-            TextView tv = (TextView)view.findViewById(R.id.phoneNumber);
-            tv.setText(""+position);
+            TextView tv = (TextView) view.findViewById(R.id.phoneNumber);
+            tv.setText("" + position);
             return view;
         }
     }
@@ -150,16 +161,17 @@ public class ContactListActivity extends FragmentActivity {
      * 名片
      */
     class Info {
-        String id;
-        String name;
-        ArrayList<String> originNumbers = new ArrayList<String>();
-        ArrayList<String> newNumbers = new ArrayList<String>();
 
-        public String getId() {
+        ArrayList<String> id = new ArrayList<>();
+        String name;
+        ArrayList<String> originNumbers = new ArrayList<>();
+        ArrayList<String> newNumbers = new ArrayList<>();
+
+        public ArrayList<String> getId() {
             return id;
         }
 
-        public void setId(String id) {
+        public void setId(ArrayList<String> id) {
             this.id = id;
         }
 
@@ -187,13 +199,23 @@ public class ContactListActivity extends FragmentActivity {
             this.newNumbers = newNumbers;
         }
 
-        @Override
+
         public String toString() {
             String s = "";
-            for (String n : newNumbers){
-                s += n;
+            int i = 0;
+            for (String k : id) {
+                try {
+                    s += "[" + k + "]" + "[" + originNumbers.get(i) +  "]" + newNumbers.get(i) +  "], ";
+                }catch (Exception e){
+                    continue;
+                }
             }
-            return String.format("Name: %s  [ID: %s], phoneNumber: %s", name, id, s);
+            //[id][originNumber][newNumber]
+            return String.format("Name: [%s], phoneNumber: [%s]", name, s);
         }
     }
+
+
+
+
 }
