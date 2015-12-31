@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">Contact</string>
+    <string name="check_result">查看结果</string>
+    <string name="switch_contry_code_on">添加国家码</string>
+    <string name="switch_contry_code_off">去掉国家码</string>
+    <string name="tips">联系人处理：去掉-和空格，添加/删除国家码</string>
 </resources>

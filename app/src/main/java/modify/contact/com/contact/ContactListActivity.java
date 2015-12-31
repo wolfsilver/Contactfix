@@ -3,6 +3,7 @@ package modify.contact.com.contact;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
 import android.provider.ContactsContract;
@@ -22,6 +23,10 @@ import java.util.Map;
 
 public class ContactListActivity extends FragmentActivity {
 
+    /**
+     * 是否带国家码
+     */
+    protected boolean isWithCountryCode = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,83 +34,126 @@ public class ContactListActivity extends FragmentActivity {
         setContentView(R.layout.activity_contact_list);
 
         Log.i("phoneNumber", "ContactListActivity created...");
-
     }
+
+
+    protected ContentResolver cr = null;
+    protected HashMap<String, Info> map = new HashMap<>();
 
 
     @Override
     protected void onStart() {
         super.onStart();
 
+
+        Intent intent = getIntent();
+        isWithCountryCode = intent.getExtras().getBoolean(MainActivity.isWithCountryCode);
+        Log.i("isWithCountryCode", String.valueOf(isWithCountryCode));
+
         ListView listView = (ListView) findViewById(R.id.listView);
 
-        ContentResolver cr = getContentResolver();
-        HashMap<String, Info> map = new HashMap<>();
-        Cursor phone = cr.query(Phone.CONTENT_URI, new String[]{
+        cr = getContentResolver();
+        final Cursor phone = cr.query(Phone.CONTENT_URI, new String[]{
                 Phone._ID, Phone.CONTACT_ID, Phone.NUMBER, Phone.DISPLAY_NAME}, null, null, null);
         if (null == phone) {
             Log.d("phoneNumber", "there is no phoneNumber.");
             return;
         }
-        while (phone.moveToNext()) {
-            String phoneNumber = phone.getString(phone.getColumnIndex(Phone.NUMBER));
-            String name = phone.getString(phone.getColumnIndex(Phone.DISPLAY_NAME));
-            String id = phone.getString(phone.getColumnIndex(Phone.CONTACT_ID));
-            String phoneID = phone.getString(phone.getColumnIndex(Phone._ID));
-            Info info = map.get(id);
-            if (null == info) {
-                info = new Info();
-                ArrayList<String> ids = new ArrayList<>();
-                ArrayList<String> number = new ArrayList<>();
 
-                ids.add(phoneID);
-                info.setId(ids);
 
-                info.setName(name);
+        Thread getList = new Thread() {
+            @Override
+            public void run() {
+                while (phone.moveToNext()) {
+                    String phoneNumber = phone.getString(phone.getColumnIndex(Phone.NUMBER));
+                    String name = phone.getString(phone.getColumnIndex(Phone.DISPLAY_NAME));
+                    String id = phone.getString(phone.getColumnIndex(Phone.CONTACT_ID));
+                    String phoneID = phone.getString(phone.getColumnIndex(Phone._ID));
+                    Info info = map.get(id);
+                    if (null == info) {
+                        info = new Info();
+                        ArrayList<String> ids = new ArrayList<>();
+                        ArrayList<String> number = new ArrayList<>();
 
-                number.add(phoneNumber);
-                info.setOriginNumbers(number);
-                map.put(id, info);
-            } else {
-                info.getOriginNumbers().add(phoneNumber);
-                info.getId().add(phoneID);
+                        ids.add(phoneID);
+                        info.setId(ids);
+
+                        info.setName(name);
+
+                        number.add(phoneNumber);
+                        info.setOriginNumbers(number);
+                        map.put(id, info);
+                    } else {
+                        info.getOriginNumbers().add(phoneNumber);
+                        info.getId().add(phoneID);
+                    }
+                }
+
+                phone.close();
+                handleNumber.start();
             }
-        }
-        phone.close();
+        };
 
-//        Iterator<Map.Entry<String, Info>> it = map.entrySet().iterator();
-//        while (it.hasNext()) {
-//            Map.Entry<String, Info> entry = it.next();
-//            System.out.println("key= " + entry.getKey() + " and value= " + entry.getValue());
-//        }
 
-        for (String key : map.keySet()) {
-            Info info = map.get(key);
+        getList.start();
 
-            ArrayList<String> originNumber = info.getOriginNumbers();
-            ArrayList<String> newNumer = info.getNewNumbers();
 
-            for (String number : originNumber){
-                newNumer.add(number.replaceAll("[\\s-]", ""));
-            }
-            info.setNewNumbers(newNumer);
-
-            Log.i("List", info.toString());
-
-            int i = 0;
-
-            for (String number : newNumer){
-                ContentValues values = new ContentValues();
-                values.put(Phone.NUMBER, number);
-
-                update(cr, info.getId().get(i) , values);
-                i++;
-            }
-
-        }
-
-        map = null;
     }
+
+    private void callBack() {
+        handleNumber.start();
+    }
+
+
+    /**
+     * 处理手机号
+     */
+    Thread handleNumber = new Thread() {
+        @Override
+        public void run() {
+            Log.i("handle", "handle number thread starts...");
+            for (String key : map.keySet()) {
+                Info info = map.get(key);
+
+                ArrayList<String> originNumber = info.getOriginNumbers();
+                ArrayList<String> newNumer = info.getNewNumbers();
+
+                for (String number : originNumber) {
+                    // 空白处理
+                    number = number.replaceAll("[\\s-]", "");
+
+                    if (isWithCountryCode) {
+                        if (number.matches("^\\+86\\d+") || number.matches("^0\\d+")) {
+                            // 区号暂时不添加国家码
+
+                        } else {
+                            number = "+86" + number;
+                        }
+                    } else {
+                        // 删除国家码
+                        number.replaceAll("^\\+86", "");
+                    }
+
+                    newNumer.add(number);
+                }
+                info.setNewNumbers(newNumer);
+
+                Log.i("List", info.toString());
+
+                int i = 0;
+
+                for (String number : newNumer) {
+                    ContentValues values = new ContentValues();
+                    values.put(Phone.NUMBER, number);
+
+                    update(cr, info.getId().get(i), values);
+                    i++;
+                }
+
+            }
+            Log.i("handle", "handle number thread end...");
+        }
+    };
 
 
     /**
@@ -113,21 +161,6 @@ public class ContactListActivity extends FragmentActivity {
      **/
     private static final String[] PHONES_PROJECTION = new String[]{
             Phone.DISPLAY_NAME, Phone.NUMBER, Phone.CONTACT_ID};
-
-    /**
-     * 联系人显示名称
-     **/
-    private static final int PHONES_DISPLAY_NAME_INDEX = 0;
-
-    /**
-     * 电话号码
-     **/
-    private static final int PHONES_NUMBER_INDEX = 1;
-
-    /**
-     * 联系人的ID
-     **/
-    private static final int PHONES_CONTACT_ID_INDEX = 2;
 
 
     private class MyAdapter extends SimpleAdapter {
@@ -172,9 +205,24 @@ public class ContactListActivity extends FragmentActivity {
      */
     class Info {
 
+        /**
+         * _ID
+         */
         ArrayList<String> id = new ArrayList<>();
+
+        /**
+         * 姓名
+         */
         String name;
+
+        /**
+         * 原始号码
+         */
         ArrayList<String> originNumbers = new ArrayList<>();
+
+        /**
+         * 格式化后号码
+         */
         ArrayList<String> newNumbers = new ArrayList<>();
 
         public ArrayList<String> getId() {
@@ -214,13 +262,8 @@ public class ContactListActivity extends FragmentActivity {
             String s = "";
             int i = 0;
             for (String k : id) {
-                try {
-                    s += "[" + k + "]" + "[" + originNumbers.get(i) +  "]" + newNumbers.get(i) +  "], ";
-                }catch (Exception e){
-                    continue;
-                }finally {
-                    i++;
-                }
+                s += "[" + k + "]" + "[" + originNumbers.get(i) + "]" + newNumbers.get(i) + "], ";
+                i++;
             }
             //[id][originNumber][newNumber]
             return String.format("Name: [%s], phoneNumber: [%s]", name, s);
@@ -230,14 +273,17 @@ public class ContactListActivity extends FragmentActivity {
 
     /**
      * 更新联系人信息
-     * @param cr
-     * @param id
-     * @param values
+     *
+     * @param cr     ContentResolver
+     * @param id     _ID
+     * @param values 新号码
      */
     public void update(ContentResolver cr, String id, ContentValues values) {
         String where = Phone._ID + " = " + id;
         int r = cr.update(ContactsContract.Data.CONTENT_URI, values, where, null);
-        Log.i("result", "number: [" + values.get(Phone.NUMBER) + "]: " + r);
+        if (r != 0) {
+            Log.i("result", "number: [" + values.get(Phone.NUMBER) + "] updated. ");
+        }
     }
 
 

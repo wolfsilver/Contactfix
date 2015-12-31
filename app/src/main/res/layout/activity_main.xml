@@ -10,12 +10,41 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context="modify.contact.com.contact.MainActivity">
 
+    <EditText
+        android:id="@+id/editText"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:clickable="false"
+        android:editable="false"
+        android:text="@string/tips"
+        />
 
-    <Button
+
+    <Switch
+        android:id="@+id/switch1"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:onClick="showContactList"
-        android:text="show_list"
+        android:layout_above="@+id/button"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_marginBottom="71dp"
+        android:checked="false"
+        android:showText="true"
+        android:textOff="@string/switch_contry_code_off"
+        android:textOn="@string/switch_contry_code_on"
         />
+
+    <Button
+        android:id="@+id/button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:onClick="showContactList"
+        android:text="@string/check_result"/>
 
 </RelativeLayout>
