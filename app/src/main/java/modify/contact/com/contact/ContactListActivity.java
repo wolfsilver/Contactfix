@@ -131,7 +131,7 @@ public class ContactListActivity extends FragmentActivity {
                         }
                     } else {
                         // 删除国家码
-                        number.replaceAll("^\\+86", "");
+                        number = number.replaceAll("^\\+86", "");
                     }
 
                     newNumer.add(number);
