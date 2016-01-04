@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.provider.ContactsContract;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.support.v4.app.FragmentActivity;
@@ -15,6 +17,7 @@ import android.view.ViewGroup;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,82 +31,91 @@ public class ContactListActivity extends FragmentActivity {
      */
     protected boolean isWithCountryCode = false;
 
+    private static Context context;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_contact_list);
+
+        context = getApplicationContext();
+
+        Intent intent = getIntent();
+        isWithCountryCode = intent.getExtras().getBoolean(MainActivity.isWithCountryCode);
+        Log.i("isWithCountryCode", String.valueOf(isWithCountryCode));
 
         Log.i("phoneNumber", "ContactListActivity created...");
     }
 
 
     protected ContentResolver cr = null;
-    protected HashMap<String, Info> map = new HashMap<>();
+    protected HashMap<String, Info> map = null;
 
+    Cursor phone = null;
 
-    @Override
-    protected void onStart() {
-        super.onStart();
+    private ListView listView;
+    private static MyAdapter adapter;
 
+    static List<Map<String, String>> al;
 
-        Intent intent = getIntent();
-        isWithCountryCode = intent.getExtras().getBoolean(MainActivity.isWithCountryCode);
-        Log.i("isWithCountryCode", String.valueOf(isWithCountryCode));
+    private static int UPDATE_UI = 0;
+    private static int FINISH = 1;
 
-        ListView listView = (ListView) findViewById(R.id.listView);
+    MyHandler myHandler = new MyHandler();
 
-        cr = getContentResolver();
-        final Cursor phone = cr.query(Phone.CONTENT_URI, new String[]{
-                Phone._ID, Phone.CONTACT_ID, Phone.NUMBER, Phone.DISPLAY_NAME}, null, null, null);
-        if (null == phone) {
-            Log.d("phoneNumber", "there is no phoneNumber.");
-            return;
-        }
+    static class MyHandler extends Handler {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
 
-
-        Thread getList = new Thread() {
-            @Override
-            public void run() {
-                while (phone.moveToNext()) {
-                    String phoneNumber = phone.getString(phone.getColumnIndex(Phone.NUMBER));
-                    String name = phone.getString(phone.getColumnIndex(Phone.DISPLAY_NAME));
-                    String id = phone.getString(phone.getColumnIndex(Phone.CONTACT_ID));
-                    String phoneID = phone.getString(phone.getColumnIndex(Phone._ID));
-                    Info info = map.get(id);
-                    if (null == info) {
-                        info = new Info();
-                        ArrayList<String> ids = new ArrayList<>();
-                        ArrayList<String> number = new ArrayList<>();
-
-                        ids.add(phoneID);
-                        info.setId(ids);
-
-                        info.setName(name);
-
-                        number.add(phoneNumber);
-                        info.setOriginNumbers(number);
-                        map.put(id, info);
-                    } else {
-                        info.getOriginNumbers().add(phoneNumber);
-                        info.getId().add(phoneID);
-                    }
-                }
-
-                phone.close();
-                handleNumber.start();
+            if (msg.what == UPDATE_UI) {
+                Log.i("Handler", "update UI...");
+                List<Map<String, String>> list = new ArrayList<>();
+                list.addAll(al);
+                adapter.mItemList = list;
+                adapter.notifyDataSetChanged();
             }
-        };
 
-
-        getList.start();
-
-
+            if (msg.what == FINISH) {
+                Log.i("Handler", "convert finished...");
+                Toast.makeText(context, "转换完成", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
-    private void callBack() {
-        handleNumber.start();
-    }
 
+    Thread getList = new Thread() {
+        @Override
+        public void run() {
+            while (phone.moveToNext()) {
+                String phoneNumber = phone.getString(phone.getColumnIndex(Phone.NUMBER));
+                String name = phone.getString(phone.getColumnIndex(Phone.DISPLAY_NAME));
+                String id = phone.getString(phone.getColumnIndex(Phone.CONTACT_ID));
+                String phoneID = phone.getString(phone.getColumnIndex(Phone._ID));
+                Info info = map.get(id);
+                if (null == info) {
+                    info = new Info();
+                    ArrayList<String> ids = new ArrayList<>();
+                    ArrayList<String> number = new ArrayList<>();
+
+                    ids.add(phoneID);
+                    info.setId(ids);
+
+                    info.setName(name);
+
+                    number.add(phoneNumber);
+                    info.setOriginNumbers(number);
+                    map.put(id, info);
+                } else {
+                    info.getOriginNumbers().add(phoneNumber);
+                    info.getId().add(phoneID);
+                }
+            }
+
+            new Thread(handleNumber).start();
+        }
+    };
 
     /**
      * 处理手机号
@@ -112,6 +124,9 @@ public class ContactListActivity extends FragmentActivity {
         @Override
         public void run() {
             Log.i("handle", "handle number thread starts...");
+
+            Map<String, String> logList = null;
+
             for (String key : map.keySet()) {
                 Info info = map.get(key);
 
@@ -143,17 +158,84 @@ public class ContactListActivity extends FragmentActivity {
                 int i = 0;
 
                 for (String number : newNumer) {
+
+                    if (number.equals(originNumber.get(i))) {
+                        Log.i("update", "no need to update...");
+                        i++;
+                        continue;
+                    }
+
                     ContentValues values = new ContentValues();
                     values.put(Phone.NUMBER, number);
-
                     update(cr, info.getId().get(i), values);
+
+                    logList = new HashMap<String, String>();
+                    logList.put("phoneNumber", originNumber.get(i) + " → " + number);
+                    al.add(logList);
+
                     i++;
                 }
 
+                Message msg = new Message();
+                msg.what = UPDATE_UI;
+                myHandler.sendMessage(msg);
             }
             Log.i("handle", "handle number thread end...");
+
+            Message msg = new Message();
+            msg.what = FINISH;
+            myHandler.sendMessage(msg);
+
         }
     };
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+
+        map = new HashMap<>();
+        listView = (ListView) findViewById(R.id.listView);
+        al = new ArrayList<Map<String, String>>();
+
+        adapter = new MyAdapter(this, al, R.layout.phone_list, new String[]{"phoneNumber"},
+                new int[]{R.id.phoneNumber});
+        listView.setAdapter(adapter);
+
+        cr = getContentResolver();
+
+        phone = cr.query(Phone.CONTENT_URI, new String[]{
+                Phone._ID, Phone.CONTACT_ID, Phone.NUMBER, Phone.DISPLAY_NAME}, null, null, null);
+        if (null == phone) {
+            Log.d("phoneNumber", "there is no phoneNumber.");
+            return;
+        }
+
+        new Thread(getList).start();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        map = new HashMap<>();
+
+        listView = (ListView) findViewById(R.id.listView);
+        al = new ArrayList<Map<String, String>>();
+
+        adapter = new MyAdapter(this, al, R.layout.phone_list, new String[]{"phoneNumber"},
+                new int[]{R.id.phoneNumber});
+        listView.setAdapter(adapter);
+
+        cr = getContentResolver();
+        phone = cr.query(Phone.CONTENT_URI, new String[]{
+                Phone._ID, Phone.CONTACT_ID, Phone.NUMBER, Phone.DISPLAY_NAME}, null, null, null);
+        if (null == phone) {
+            Log.d("phoneNumber", "there is no phoneNumber.");
+            return;
+        }
+
+        new Thread(getList).start();
+    }
 
 
     /**
@@ -165,12 +247,12 @@ public class ContactListActivity extends FragmentActivity {
 
     private class MyAdapter extends SimpleAdapter {
         int count = 0;
-        private List<Map<String, Integer>> mItemList;
+        private List<Map<String, String>> mItemList;
 
-        public MyAdapter(Context context, List<? extends Map<String, Integer>> data,
+        public MyAdapter(Context context, List<? extends Map<String, String>> data,
                          int resource, String[] from, int[] to) {
             super(context, data, resource, from, to);
-            mItemList = (List<Map<String, Integer>>) data;
+            mItemList = (List<Map<String, String>>) data;
             if (data == null) {
                 count = 0;
             } else {
@@ -179,6 +261,9 @@ public class ContactListActivity extends FragmentActivity {
         }
 
         public int getCount() {
+            if (null == mItemList) {
+                return 0;
+            }
             return mItemList.size();
         }
 
@@ -192,11 +277,20 @@ public class ContactListActivity extends FragmentActivity {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            Map<String, Integer> map = mItemList.get(position);
+            Map<String, String> map = mItemList.get(position);
             View view = super.getView(position, convertView, parent);
             TextView tv = (TextView) view.findViewById(R.id.phoneNumber);
-            tv.setText("" + position);
+            tv.setText(map.get("phoneNumber"));
             return view;
+        }
+    }
+
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (null != phone) {
+            phone.close();
         }
     }
 
@@ -262,7 +356,7 @@ public class ContactListActivity extends FragmentActivity {
             String s = "";
             int i = 0;
             for (String k : id) {
-                s += "[" + k + "]" + "[" + originNumbers.get(i) + "]" + newNumbers.get(i) + "], ";
+                s += "[" + k + "]" + " [" + originNumbers.get(i) + "] [" + newNumbers.get(i) + "] ], ";
                 i++;
             }
             //[id][originNumber][newNumber]
