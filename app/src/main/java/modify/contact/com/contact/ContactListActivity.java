@@ -126,6 +126,7 @@ public class ContactListActivity extends FragmentActivity {
             Log.i("handle", "handle number thread starts...");
 
             Map<String, String> logList = null;
+            int k = 0;
 
             for (String key : map.keySet()) {
                 Info info = map.get(key);
@@ -146,14 +147,14 @@ public class ContactListActivity extends FragmentActivity {
                         }
                     } else {
                         // 删除国家码
-                        number = number.replaceAll("^\\+86", "");
+                        number = number.replace("^\\+86", "");
                     }
 
                     newNumer.add(number);
                 }
                 info.setNewNumbers(newNumer);
 
-                Log.i("List", info.toString());
+//                Log.d("List", info.toString());
 
                 int i = 0;
 
@@ -176,13 +177,23 @@ public class ContactListActivity extends FragmentActivity {
                     i++;
                 }
 
-                Message msg = new Message();
-                msg.what = UPDATE_UI;
-                myHandler.sendMessage(msg);
+                k++;
+
+                if (k % 10 == 0) {
+                    Message msg = new Message();
+                    msg.what = UPDATE_UI;
+                    myHandler.sendMessage(msg);
+                }
+
+
             }
             Log.i("handle", "handle number thread end...");
 
             Message msg = new Message();
+            msg.what = UPDATE_UI;
+            myHandler.sendMessage(msg);
+
+            msg = new Message();
             msg.what = FINISH;
             myHandler.sendMessage(msg);
 
