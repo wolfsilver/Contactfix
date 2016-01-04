@@ -170,7 +170,7 @@ public class ContactListActivity extends FragmentActivity {
                     values.put(Phone.NUMBER, number);
                     update(cr, info.getId().get(i), values);
 
-                    logList = new HashMap<String, String>();
+                    logList = new HashMap<>();
                     logList.put("phoneNumber", originNumber.get(i) + " → " + number);
                     al.add(logList);
 
@@ -206,7 +206,7 @@ public class ContactListActivity extends FragmentActivity {
 
         map = new HashMap<>();
         listView = (ListView) findViewById(R.id.listView);
-        al = new ArrayList<Map<String, String>>();
+        al = new ArrayList<>();
 
         adapter = new MyAdapter(this, al, R.layout.phone_list, new String[]{"phoneNumber"},
                 new int[]{R.id.phoneNumber});
@@ -231,7 +231,7 @@ public class ContactListActivity extends FragmentActivity {
         map = new HashMap<>();
 
         listView = (ListView) findViewById(R.id.listView);
-        al = new ArrayList<Map<String, String>>();
+        al = new ArrayList<>();
 
         adapter = new MyAdapter(this, al, R.layout.phone_list, new String[]{"phoneNumber"},
                 new int[]{R.id.phoneNumber});
@@ -247,14 +247,6 @@ public class ContactListActivity extends FragmentActivity {
 
         new Thread(getList).start();
     }
-
-
-    /**
-     * 获取库Phone表字段
-     **/
-    private static final String[] PHONES_PROJECTION = new String[]{
-            Phone.DISPLAY_NAME, Phone.NUMBER, Phone.CONTACT_ID};
-
 
     private class MyAdapter extends SimpleAdapter {
         int count = 0;
